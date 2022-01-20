@@ -187,7 +187,7 @@ while True:
 
         if stop_coll_dirchange == True:
             
-            print("collision")
+            # print("collision")
                   
             stop_coll_dirchange = False
         
