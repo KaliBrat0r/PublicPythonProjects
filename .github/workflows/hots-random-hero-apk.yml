@@ -1,0 +1,105 @@
+name: HotS Random Hero APK
+
+on:
+  push:
+    branches:
+      - hots-random-hero-apk-build
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Create Android project
+        shell: bash
+        run: |
+          set -e
+          ROOT="$GITHUB_WORKSPACE/hots-apk-build/android"
+          mkdir -p "$ROOT/app/src/main/java/hu/hots/randomhero" "$ROOT/app/src/main/assets" "$ROOT/app/src/main/res/values" "$ROOT/app/src/main/res/mipmap-xxxhdpi"
+          cat > "$ROOT/settings.gradle.kts" <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "HotSRandomHero"
+          include(":app")
+          EOF
+          cat > "$ROOT/build.gradle.kts" <<'EOF'
+          plugins { id("com.android.application") version "8.7.3" apply false }
+          EOF
+          cat > "$ROOT/gradle.properties" <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+          cat > "$ROOT/app/build.gradle.kts" <<'EOF'
+          plugins { id("com.android.application") }
+          android {
+              namespace = "hu.hots.randomhero"
+              compileSdk = 35
+              defaultConfig { applicationId = "hu.hots.randomhero"; minSdk = 24; targetSdk = 35; versionCode = 1; versionName = "1.0" }
+              buildTypes { release { isMinifyEnabled = false } }
+          }
+          EOF
+          cat > "$ROOT/app/src/main/AndroidManifest.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:allowBackup="true" android:hardwareAccelerated="true" android:label="HotS Random Hero" android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme">
+                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize">
+                      <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+          cat > "$ROOT/app/src/main/res/values/styles.xml" <<'EOF'
+          <resources><style name="AppTheme" parent="android:style/Theme.Material.NoActionBar.Fullscreen"><item name="android:windowNoTitle">true</item><item name="android:windowActionModeOverlay">true</item><item name="android:windowFullscreen">true</item><item name="android:windowBackground">#000000</item><item name="android:colorAccent">#8E5CFF</item><item name="android:navigationBarColor">#000000</item><item name="android:statusBarColor">#000000</item></style></resources>
+          EOF
+          cat > "$ROOT/app/src/main/java/hu/hots/randomhero/MainActivity.java" <<'EOF'
+          package hu.hots.randomhero;
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+              private WebView webView;
+              @Override protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState); hideSystemUi();
+                  webView = new WebView(this); webView.setBackgroundColor(Color.BLACK); webView.setVerticalScrollBarEnabled(false); webView.setHorizontalScrollBarEnabled(false); webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  WebSettings s = webView.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setAllowFileAccess(true); s.setAllowContentAccess(true); s.setBuiltInZoomControls(false); s.setDisplayZoomControls(false); s.setSupportZoom(false); s.setLoadWithOverviewMode(false); s.setUseWideViewPort(true);
+                  webView.setWebViewClient(new WebViewClient()); webView.setWebChromeClient(new WebChromeClient());
+                  setContentView(webView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+              private void hideSystemUi() { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE); }
+              @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus) hideSystemUi(); }
+              @Override protected void onResume() { super.onResume(); hideSystemUi(); }
+          }
+          EOF
+          cat > "$ROOT/app/src/main/assets/index.html" <<'EOF'
+          <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;background:#000;color:white;display:grid;place-items:center;font-family:sans-serif}</style></head><body>HotS Random Hero</body></html>
+          EOF
+          echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > "$ROOT/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+      - name: Build debug APK
+        working-directory: hots-apk-build/android
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HotS-Random-Hero-APK
+          path: hots-apk-build/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
