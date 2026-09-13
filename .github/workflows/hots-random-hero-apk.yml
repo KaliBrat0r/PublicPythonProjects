@@ -47,7 +47,7 @@ jobs:
           android {
               namespace = "hu.hots.randomhero"
               compileSdk = 35
-              defaultConfig { applicationId = "hu.hots.randomhero"; minSdk = 24; targetSdk = 35; versionCode = 1; versionName = "1.0" }
+              defaultConfig { applicationId = "hu.hots.randomhero"; minSdk = 24; targetSdk = 29; versionCode = 1; versionName = "1.0" }
               buildTypes { release { isMinifyEnabled = false } }
           }
           EOF
